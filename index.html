@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="lt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GrandRP Treasure finder</title>
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1010;--panel:#131c1b;--line:#293735;--muted:#9aadaa;--green:#b7f36b;--text:#edf4f0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1a2925 0,#0b1010 55%);font:15px/1.5 system-ui,Segoe UI,sans-serif;color:var(--text)}
+main{max-width:1120px;margin:auto;padding:32px 20px 60px}.eyebrow{color:var(--green);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+h1{font-size:clamp(30px,5vw,48px);line-height:1.06;margin:10px 0 12px;letter-spacing:-.04em}p{color:var(--muted);margin-top:0}
+.panel{background:rgba(19,28,27,.94);border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:20px;box-shadow:0 14px 40px #0002}h2{font-size:18px;margin:0 0 12px}
+button{border:0;border-radius:10px;padding:12px 17px;background:var(--green);color:#15200e;font-weight:800;font:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#26342f;color:var(--text)}
+input[type=file]{max-width:100%;padding:10px;border:1px solid #3b4c48;border-radius:10px;background:#0b1211;color:var(--text)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}.status{margin-top:12px;font-size:14px;color:var(--green);min-height:22px}.error{color:#ffb3a7}.hint{font-size:13px;color:var(--muted)}
+#drop{margin-top:12px;min-height:170px;border:1.5px dashed #536760;border-radius:14px;display:grid;place-items:center;text-align:center;padding:22px;background:#0b121188}
+#queryPreview{max-width:100%;max-height:300px;display:none;border-radius:10px}.results{margin-top:16px}.card{overflow:hidden;border:1px solid var(--line);border-radius:14px;background:#0c1312}.card img{width:100%;max-height:80vh;object-fit:contain;background:#080c0b;display:block}.cardbody{padding:12px}
+#galleryInfo{white-space:pre-wrap}.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:12px}.thumbs img{width:100%;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+@media(max-width:600px){main{padding:22px 12px}.panel{padding:15px}}
+</style></head><body><main>
+<div class="eyebrow">VEIKIA NARŠYKLĖJE · GITHUB PAGES</div><h1>GrandRP Treasure finder</h1>
+<p>Įkelk galerijos nuotraukas ir įklijuok telefono ekrano nuotrauką. Paieška ir apkarpymas vyksta tavo naršyklėje.</p>
+<section class="panel"><h2>1. Įkelk galeriją</h2>
+<p class="hint">Pasirink visas savo vietovių nuotraukas. Jei failai sudėti poromis, jie poruojami pagal failų pavadinimų tvarką: 1–2, 3–4 ir t. t.</p>
+<input id="galleryInput" type="file" accept="image/*" multiple>
+<div id="galleryInfo" class="status">Galerija dar neįkelta.</div><div id="thumbs" class="thumbs"></div>
+</section>
+<section class="panel"><h2>2. Įklijuok arba pasirink telefono ekrano vaizdą</h2>
+<div id="drop" tabindex="0"><div id="dropText"><b>Paspausk puslapį ir naudok Ctrl + V</b><p class="hint">Arba pasirink failą / nutempk jį į šią sritį.</p><input id="queryInput" type="file" accept="image/*"></div><img id="queryPreview" alt="Paieškos vaizdas"></div>
+<div class="row"><button id="searchBtn" disabled>Ieškoti atitikmens</button><button id="clearBtn" class="secondary">Išvalyti vaizdą</button></div><div id="status" class="status">Laukiama, kol įkelsi galeriją.</div>
+</section>
+<section class="panel"><h2>3. Rezultatas</h2><div id="results" class="results"></div></section>
+</main>
+<script>
+let cvReady=false, gallery=[], queryFile=null, queryUrl=null;
+const $=id=>document.getElementById(id);
+function status(msg,error=false){$('status').textContent=msg;$('status').classList.toggle('error',error)}
+function natural(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'})}
+function loadImage(file){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('Nepavyko atidaryti '+file.name));im.src=URL.createObjectURL(file)})}
+function matFromImage(im,maxSide=1200){let scale=Math.min(1,maxSide/Math.max(im.naturalWidth,im.naturalHeight));let c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*scale));c.height=Math.max(1,Math.round(im.naturalHeight*scale));let ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(im,0,0,c.width,c.height);let rgba=cv.imread(c), gray=new cv.Mat();cv.cvtColor(rgba,gray,cv.COLOR_RGBA2GRAY);rgba.delete();return {gray,scale,width:im.naturalWidth,height:im.naturalHeight}}
+async function features(file){const im=await loadImage(file);const m=matFromImage(im);let kp=new cv.KeyPointVector(),desc=new cv.Mat(),orb=new cv.ORB(1800);orb.detectAndCompute(m.gray,new cv.Mat(),kp,desc);orb.delete();return {...m,kp,desc,name:file.name,file}}
+function dispose(f){if(f){f.gray.delete();f.kp.delete();f.desc.delete()}}
+function setQuery(file){if(!file||!file.type.startsWith('image/'))return;queryFile=file;if(queryUrl)URL.revokeObjectURL(queryUrl);queryUrl=URL.createObjectURL(file);$('queryPreview').src=queryUrl;$('queryPreview').style.display='block';$('dropText').style.display='none';$('searchBtn').disabled=!(gallery.length&&cvReady);status('Telefono vaizdas paruoštas.')}
+$('galleryInput').addEventListener('change',async e=>{const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).sort(natural);if(!files.length)return;gallery=[];$('thumbs').innerHTML='';$('galleryInfo').textContent='Apdorojamos '+files.length+' nuotraukos…';$('searchBtn').disabled=true;
+try{for(let i=0;i<files.length;i++){let f=await features(files[i]);gallery.push(f);if(i%5===0)$('galleryInfo').textContent=`Apdorojama ${i+1} iš ${files.length}…`;const im=document.createElement('img');im.src=URL.createObjectURL(files[i]);im.title=files[i].name;$('thumbs').append(im)}$('galleryInfo').textContent=`Paruošta ${gallery.length} nuotraukų. ${Math.floor(gallery.length/2)} porų.`;if(queryFile&&cvReady)$('searchBtn').disabled=false;status('Galerija paruošta paieškai.')}catch(err){status(err.message,true)}
+});
+$('queryInput').addEventListener('change',e=>setQuery(e.target.files[0]));
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(x=>x.type.startsWith('image/'));if(it){e.preventDefault();setQuery(it.getAsFile())}});
+$('drop').addEventListener('dragover',e=>{e.preventDefault();$('drop').style.borderColor='var(--green)'});
+$('drop').addEventListener('dragleave',()=>$('drop').style.borderColor='');
+$('drop').addEventListener('drop',e=>{e.preventDefault();$('drop').style.borderColor='';if(e.dataTransfer.files[0])setQuery(e.dataTransfer.files[0])});
+$('clearBtn').onclick=()=>{queryFile=null;if(queryUrl)URL.revokeObjectURL(queryUrl);queryUrl=null;$('queryPreview').style.display='none';$('dropText').style.display='block';$('queryInput').value='';$('results').innerHTML='';$('searchBtn').disabled=!gallery.length;status('Telefono vaizdas išvalytas.')};
+function match(q,c){if(q.desc.empty()||c.desc.empty())return {score:0,crop:null};let matcher=new cv.BFMatcher(cv.NORM_HAMMING,false),knn=new cv.DMatchVectorVector();matcher.knnMatch(q.desc,c.desc,knn,2);let good=[];for(let i=0;i<knn.size();i++){let p=knn.get(i);if(p.size()>=2){let a=p.get(0),b=p.get(1);if(a.distance<0.75*b.distance)good.push(a)}}knn.delete();matcher.delete();if(good.length<4)return {score:good.length,crop:null};
+let src=cv.matFromArray(good.length,1,cv.CV_32FC2,good.flatMap(m=>{let p=q.kp.get(m.queryIdx).pt;return [p.x,p.y]}));let dst=cv.matFromArray(good.length,1,cv.CV_32FC2,good.flatMap(m=>{let p=c.kp.get(m.trainIdx).pt;return [p.x,p.y]}));let mask=new cv.Mat(),H=cv.findHomography(src,dst,cv.RANSAC,5,mask);let pts=[];for(let i=0;i<good.length;i++)if(mask.rows&&mask.data[i]){let p=c.kp.get(good[i].trainIdx).pt;pts.push(p)}let crop=null;if(pts.length>=6){let xs=pts.map(p=>p.x/c.scale),ys=pts.map(p=>p.y/c.scale);let x0=Math.max(0,Math.floor(Math.min(...xs))),y0=Math.max(0,Math.floor(Math.min(...ys))),x1=Math.min(c.width,Math.ceil(Math.max(...xs))),y1=Math.min(c.height,Math.ceil(Math.max(...ys)));let px=Math.max(18,(x1-x0)*.18),py=Math.max(18,(y1-y0)*.18);x0=Math.max(0,Math.floor(x0-px));y0=Math.max(0,Math.floor(y0-py));x1=Math.min(c.width,Math.ceil(x1+px));y1=Math.min(c.height,Math.ceil(y1+py));if(x1-x0>40&&y1-y0>40)crop=[x0,y0,x1-x0,y1-y0]}
+src.delete();dst.delete();mask.delete();H.delete();return {score:pts.length*3+good.length,crop}}
+$('searchBtn').onclick=async()=>{if(!queryFile||!gallery.length||!cvReady)return;$('searchBtn').disabled=true;$('results').innerHTML='';status('Ieškoma panašiausios vietovės…');let q;
+try{q=await features(queryFile);let best=null;for(let i=0;i<gallery.length;i++){let r=match(q,gallery[i]);if(!best||r.score>best.score)best={...r,item:gallery[i],index:i};if(i%8===0)status(`Lyginama ${i+1} iš ${gallery.length} nuotraukų…`)}if(!best||best.score<8)throw Error('Atitikmens nepavyko patikimai rasti. Bandyk aiškesnę telefono ekrano nuotrauką.');
+const c=best.item;let im=await loadImage(c.file),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');if(best.crop){let [x,y,w,h]=best.crop;canvas.width=w;canvas.height=h;ctx.drawImage(im,x,y,w,h,0,0,w,h)}else{canvas.width=im.naturalWidth;canvas.height=im.naturalHeight;ctx.drawImage(im,0,0)}const card=document.createElement('article');card.className='card';const out=document.createElement('img');out.src=canvas.toDataURL('image/jpeg',.94);out.alt='Apkarpyta rasta vietovė';const body=document.createElement('div');body.className='cardbody';body.textContent=`Rasta nuotrauka: ${c.name} · atitikmens balas ${best.score}`;let pair=gallery[best.index%2===0?best.index+1:best.index-1];if(pair){const btn=document.createElement('button');btn.className='secondary';btn.textContent='Atidaryti poros nuotrauką';btn.style.marginTop='10px';btn.onclick=()=>{const u=URL.createObjectURL(pair.file);window.open(u,'_blank')};body.append(document.createElement('br'),btn)}card.append(out,body);$('results').append(card);status('Paieška baigta. Vietovės sritis apkarpyta automatiškai.')}catch(err){status(err.message||'Paieška nepavyko.',true)}finally{if(q)dispose(q);$('searchBtn').disabled=!(queryFile&&gallery.length&&cvReady)}};
+function onCvReady(){if(typeof cv==='undefined'||!cv.Mat){setTimeout(onCvReady,250);return}cvReady=true;status('Vaizdų apdorojimas paruoštas. Įkelk galeriją.');}
+if(typeof cv!=='undefined'&&cv.Mat)onCvReady();else{let t=setInterval(()=>{if(typeof cv!=='undefined'&&cv.Mat){clearInterval(t);onCvReady()}},250);setTimeout(()=>{if(!cvReady)status('Nepavyko įkelti vaizdų bibliotekos. Patikrink interneto ryšį ir perkrauk puslapį.',true)},20000)}
+</script></body></html>
