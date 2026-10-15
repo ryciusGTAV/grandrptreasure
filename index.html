@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand RP Treasure AI</title>
+    <!-- Užkrauname Google Gen AI SDK -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.run/@google/genai"
+        }
+      }
+    </script>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1e1e24;
+            --accent-color: #7289da;
+            --text-color: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .instructions {
+            text-align: center;
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 30px;
+        }
+
+        .gallery-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(114, 137, 218, 0.3);
+        }
+
+        .card.highlight {
+            border: 2px solid #43b581;
+            box-shadow: 0 0 20px rgba(67, 181, 129, 0.6);
+        }
+
+        .card-phone-screen {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-size: 435%; 
+            background-position: 90.5% 64.5%; 
+            background-repeat: no-repeat;
+            border-bottom: 2px solid #222;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            cursor: zoom-out;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 85vh;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .modal-text {
+            margin-top: 15px;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 35px;
+            color: white;
+            cursor: pointer;
+        }
+        
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            color: white;
+            font-size: 20px;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Grand RP Treasure AI</h1>
+        <p>Išmanieji lobių ieškikliai su Gemini</p>
+    </header>
+
+    <div class="instructions">
+        💡 <em>Nukopijuokite nuotrauką žaidime (`PrintScreen`) ir paspauskite <b>Ctrl + V</b> bet kur puslapyje – Gemini AI suras tinkamą kortelę ir ją pažymės!</em>
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid"></div>
+
+    <div class="modal" id="imageModal" onclick="closeModal()">
+        <span class="close-btn">&times;</span>
+        <img class="modal-content" id="modalImg">
+        <div class="modal-text" id="modalText"></div>
+    </div>
+
+    <div id="loadingOverlay">🤖 Gemini AI analizuoja nuotrauką...</div>
+
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        const API_KEY = "AQ.Ab8RN6KfyMS_IxXr2_QFCck7VXHZAt1frt0Jv3JEDDfc1c7fJg";
+
+        const treasures = [
+            { phoneImg: "images/20261011172331_1.jpg", fullImg: "images/20261011172339_2.jpg" },
+            { phoneImg: "images/20261009181352_1.jpg", fullImg: "images/20261009181405_1.jpg" },
+            { phoneImg: "images/20261009151118_1.jpg", fullImg: "images/20261009151131_1.jpg" },
+            { phoneImg: "images/20261011134530_1.jpg", fullImg: "images/20261011134540_1.jpg" },
+            { phoneImg: "images/20261009095405_1.jpg", fullImg: "images/20261009095419_1.jpg" },
+            { phoneImg: "images/20261010183836_1.jpg", fullImg: "images/20261010183848_1.jpg" },
+            { phoneImg: "images/20261011193512_1.jpg", fullImg: "images/20261011193522_1.jpg" },
+            { phoneImg: "images/20261008140617_1.jpg", fullImg: "images/20261008140630_1.jpg" },
+            { phoneImg: "images/20261009191448_1.jpg", fullImg: "images/20261009191458_1.jpg" },
+            { phoneImg: "images/20261010233234_1.jpg", fullImg: "images/20261010233245_1.jpg" },
+            { phoneImg: "images/20261009160058_1.jpg", fullImg: "images/20261009160114_1.jpg" },
+            { phoneImg: "images/20261011200906_1.jpg", fullImg: "images/20261011200926_1.jpg" },
+            { phoneImg: "images/20261010175045_1.jpg", fullImg: "images/20261010175055_3.jpg" },
+            { phoneImg: "images/20261010193748_1.jpg", fullImg: "images/20261010193757_1.jpg" },
+            { phoneImg: "images/20261008203514_1.jpg", fullImg: "images/20261008203527_1.jpg" },
+            { phoneImg: "images/20261010121045_1.jpg", fullImg: "images/20261010121056_1.jpg" },
+            { phoneImg: "images/20261011102803_1.jpg", fullImg: "images/20261011102811_1.jpg" },
+            { phoneImg: "images/20261009125048_1.jpg", fullImg: "images/20261009125124_1.jpg" },
+            { phoneImg: "images/20261010111422_1.jpg", fullImg: "images/20261010111430_1.jpg" },
+            { phoneImg: "images/20261009082132_1.jpg", fullImg: "images/20261009082144_1.jpg" },
+            { phoneImg: "images/20261008230531_1.jpg", fullImg: "images/20261008230542_1.jpg" },
+            { phoneImg: "images/20261011152526_1.jpg", fullImg: "images/20261011152539_1.jpg" },
+            { phoneImg: "images/20261008125418_1.jpg", fullImg: "images/20261008125438_1.jpg" },
+            { phoneImg: "images/20261010162211_1.jpg", fullImg: "images/20261010162247_2.jpg" },
+            { phoneImg: "images/20261011101037_1.jpg", fullImg: "images/20261011101048_2.jpg" },
+            { phoneImg: "images/20261010150927_1.jpg", fullImg: "images/20261010150936_2.jpg" },
+            { phoneImg: "images/20261010103031_1.jpg", fullImg: "images/20261010103039_1.jpg" },
+            { phoneImg: "images/20261008221900_1.jpg", fullImg: "images/20261008221917_1.jpg" },
+            { phoneImg: "images/20261011115607_1.jpg", fullImg: "images/20261011115618_1.jpg" },
+            { phoneImg: "images/20261008150049_1.jpg", fullImg: "images/20261008150106_1.jpg" },
+            { phoneImg: "images/20261012133212_1.jpg", fullImg: "images/20261012133221_1.jpg" },
+            { phoneImg: "images/20261012134535_1.jpg", fullImg: "images/20261012134550_1.jpg" },
+            { phoneImg: "images/20261012150017_1.jpg", fullImg: "images/20261012150028_2.jpg" },
+            { phoneImg: "images/20261012162907_1.jpg", fullImg: "images/20261012162917_1.jpg" },
+            { phoneImg: "images/20261012165956_1.jpg", fullImg: "images/20261012170008_3.jpg" },
+            { phoneImg: "images/20261012181436_1.jpg", fullImg: "images/20261012181444_2.jpg" },
+            { phoneImg: "images/20261012191402_1.jpg", fullImg: "images/20261012191411_3.jpg" },
+            { phoneImg: "images/20261013081539_1.jpg", fullImg: "images/20261013081547_2.jpg" },
+            { phoneImg: "images/20261013091627_1.jpg", fullImg: "images/20261013091636_1.jpg" },
+            { phoneImg: "images/20261013102633_1.jpg", fullImg: "images/20261013102642_1.jpg" },
+            { phoneImg: "images/20261013112658_1.jpg", fullImg: "images/20261013112708_2.jpg" },
+            { phoneImg: "images/20261013122824_1.jpg", fullImg: "images/20261013122834_2.jpg" },
+            { phoneImg: "images/20261009171203_1.jpg", fullImg: "images/20261009171358_1.jpg" }
+        ];
+
+        window.renderGallery = function(items) {
+            const grid = document.getElementById('galleryGrid');
+            grid.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.id = `card-${index}`;
+                card.onclick = () => openModal(item.fullImg, `Lobis #${index + 1}`);
+
+                card.innerHTML = `
+                    <div class="card-phone-screen" style="background-image: url('${item.phoneImg}');"></div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        window.openModal = function(imgSrc, caption) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImg');
+            const modalText = document.getElementById('modalText');
+            
+            modal.style.display = 'flex';
+            modalImg.src = imgSrc;
+            modalText.innerText = caption;
+        }
+
+        window.closeModal = function() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        function fileToGenerativePart(base64Data, mimeType) {
+            return {
+                inlineData: {
+                    data: base64Data.split(",")[1],
+                    mimeType
+                },
+            };
+        }
+
+        window.addEventListener('paste', async (event) => {
+            const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+            
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file') {
+                    const blob = item.getAsFile();
+                    const reader = new FileReader();
+                    
+                    reader.onload = async function(e) {
+                        const base64Img = e.target.result;
+                        document.getElementById('loadingOverlay').style.display = 'flex';
+
+                        try {
+                            const ai = new GoogleGenAI({ apiKey: API_KEY });
+                            const userImagePart = fileToGenerativePart(base64Img, blob.type || "image/jpeg");
+
+                            const response = await ai.models.generateContent({
+                                model: 'gemini-3.8-flash',
+                                contents: [
+                                    `Vartotojas įklijavo Grand RP žaidimo nuotrauką iš vietovės. Mes turime ${treasures.length} lobių galeriją (indeksai nuo 0 iki ${treasures.length - 1}). Įvertink bendrą kontekstą ir atsakyk TIKTIKAI su tiksliu ID skaičiumi nuo 0 iki ${treasures.length - 1}, kuris geriausiai atitinka šią vietą. Jei nežinai, parašyk 0.`,
+                                    userImagePart
+                                ]
+                            });
+
+                            const resultText = response.text.trim();
+                            const matchedIndex = parseInt(resultText, 10);
+
+                            document.getElementById('loadingOverlay').style.display = 'none';
+
+                            if (!isNaN(matchedIndex) && matchedIndex >= 0 && matchedIndex < treasures.length) {
+                                document.querySelectorAll('.card').forEach(c => c.classList.remove('highlight'));
+                                
+                                setTimeout(() => {
+                                    const cardEl = document.getElementById(`card-${matchedIndex}`);
+                                    if (cardEl) {
+                                        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        cardEl.classList.add('highlight');
+                                    }
+                                }, 100);
+                            } else {
+                                alert("Nepavyko tiksliai identifikuoti nuotraukos.");
+                            }
+
+                        } catch (error) {
+                            document.getElementById('loadingOverlay').style.display = 'none';
+                            console.error(error);
+                            alert("Klaida jungiantis prie Gemini AI: " + error.message);
+                        }
+                    };
+                    
+                    reader.readAsDataURL(blob);
+                    break;
+                }
+            }
+        });
+
+        renderGallery(treasures);
+    </script>
+</body>
+</html>
