@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand RP Treasure</title>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1e1e24;
+            --accent-color: #7289da;
+            --text-color: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .filter-container {
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            display: flex;
+            justify-content: center;
+        }
+
+        input[type="text"] {
+            padding: 12px 20px;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background-color: var(--card-bg);
+            color: white;
+            font-size: 16px;
+        }
+
+        .gallery-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(114, 137, 218, 0.3);
+        }
+
+        /* Tikslus telefono ekrano rėmas */
+        .card-phone-screen {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-size: 435%; 
+            background-position: 90.5% 64.5%; 
+            background-repeat: no-repeat;
+            border-bottom: 2px solid #222;
+        }
+
+        .card-info {
+            padding: 15px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .location-info {
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .card-tags {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 8px;
+        }
+
+        .tag {
+            background: #2c2f38;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-right: 5px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        /* Modalinis langas peržiūrai paspaudus */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            cursor: zoom-out;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 85vh;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .modal-text {
+            margin-top: 15px;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 35px;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Grand RP Treasure</h1>
+        <p>Filtruokite nuotraukas pagal raktinius žodžius</p>
+    </header>
+
+    <div class="filter-container">
+        <input type="text" id="searchInput" placeholder="Ieškoti (pvz., Grapeseed, gate)..." onkeyup="filterImages()">
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid"></div>
+
+    <div class="modal" id="imageModal" onclick="closeModal()">
+        <span class="close-btn">&times;</span>
+        <img class="modal-content" id="modalImg">
+        <div class="modal-text" id="modalText"></div>
+    </div>
+
+    <script>
+        const treasures = [
+            {
+                title: "Alamo Sea Wooden Shack",
+                location: "North Calafia Way",
+                tags: "medinis pastatas paletes vanduo",
+                phoneImg: "images/20261011172331_1.jpg",
+                fullImg: "images/20261011172339_2.jpg"
+            },
+            {
+                title: "Alta Courtyard Entrance",
+                location: "Elgin Ave",
+                tags: "melyna namelis durys plytelės medelis",
+                phoneImg: "images/20261009181352_1.jpg",
+                fullImg: "images/20261009181405_1.jpg"
+            },
+            {
+                title: "Cypress Flats Railway Bridge",
+                location: "Buccaneer Way",
+                tags: "begiai graficiai",
+                phoneImg: "images/20261009151118_1.jpg",
+                fullImg: "images/20261009151131_1.jpg"
+            },
+            {
+                title: "Del Perro Beach Pier Building",
+                location: "Red Desert Ave",
+                tags: "medinis tiltas durys balkonas pastatas",
+                phoneImg: "images/20261011134530_1.jpg",
+                fullImg: "images/20261011134540_1.jpg"
+            },
+            {
+                title: "Del Perro Building Entrance",
+                location: "South Rockford Dr",
+                tags: "durys laiptai stogelis city",
+                phoneImg: "images/20261009095405_1.jpg",
+                fullImg: "images/20261009095419_1.jpg"
+            },
+            {
+                title: "Del Perro Loading Bay",
+                location: "Bay City Ave",
+                tags: "garazas vartai rampos",
+                phoneImg: "images/20261010183836_1.jpg",
+                fullImg: "images/20261010183848_1.jpg"
+            },
+            {
+                title: "Downtown Vinewood Alley Garage",
+                location: "Vinewood Blvd",
+                tags: "garazas vartai aikstele",
+                phoneImg: "images/20261011193512_1.jpg",
+                fullImg: "images/20261011193522_1.jpg"
+            },
+            {
+                title: "Downtown Vinewood Mural",
+                location: "Downtown Vinewood",
+                tags: "siena piesinys graficiai garazas konteineriai",
+                phoneImg: "images/20261008140617_1.jpg",
+                fullImg: "images/20261008140630_1.jpg"
+            },
+            {
+                title: "Grapeseed Barn",
+                location: "O'Neil Way",
+                tags: "klėtis tvartas durys medinis pastatas",
+                phoneImg: "images/20261009191448_1.jpg",
+                fullImg: "images/20261009191458_1.jpg"
+            },
+            {
+                title: "Grapeseed Backstreet Garage",
+                location: "Grapeseed Main St",
+                tags: "garazas durys pastatas",
+                phoneImg: "images/20261010233234_1.jpg",
+                fullImg: "images/20261010233245_1.jpg"
+            },
+            {
+                title: "Grapeseed Farmhouse",
+                location: "Union Rd",
+                tags: "medinis pastatas durys stogelis langai paletes",
+                phoneImg: "images/20261009160058_1.jpg",
+                fullImg: "images/20261009160114_1.jpg"
+            },
+            {
+                title: "Grapeseed Farmhouse Interior",
+                location: "Union Rd",
+                tags: "virtuve stalas maistas baldai",
+                phoneImg: "images/20261011200906_1.jpg",
+                fullImg: "images/20261011200926_1.jpg"
+            },
+            {
+                title: "Grapeseed Garage Workshop",
+                location: "East Joshua Road",
+                tags: "garazas vartai irankiai",
+                phoneImg: "images/20261010175045_1.jpg",
+                fullImg: "images/20261010175055_3.jpg"
+            },
+            {
+                title: "Grapeseed Rural House",
+                location: "East Joshua Road",
+                tags: "pastatas dezes prop14 zoles",
+                phoneImg: "images/20261010193748_1.jpg",
+                fullImg: "images/20261010193757_1.jpg"
+            },
+            {
+                title: "Grapeseed Scrap Yard",
+                location: "Seaview Rd",
+                tags: "konteineris metalas paletes pastatas siena melyna",
+                phoneImg: "images/20261008203514_1.jpg",
+                fullImg: "images/20261008203527_1.jpg"
+            },
+            {
+                title: "La Mesa Loading Area",
+                location: "Olympic Fwy",
+                tags: "dezes paletes garazas vartai",
+                phoneImg: "images/20261010121045_1.jpg",
+                fullImg: "images/20261010121056_1.jpg"
+            },
+            {
+                title: "Little Seoul Garage Alley",
+                location: "South Rockford Dr",
+                tags: "garazas vartai stogelis stulpelis",
+                phoneImg: "images/20261011102803_1.jpg",
+                fullImg: "images/20261011102811_1.jpg"
+            },
+            {
+                title: "Los Santos Airport Gate 1",
+                location: "Runway1",
+                tags: "gate1 durys dezes oro uostas",
+                phoneImg: "images/20261009125048_1.jpg",
+                fullImg: "images/20261009125124_1.jpg"
+            },
+            {
+                title: "Los Santos Airport Loading Docks",
+                location: "Greenwich Pkwy",
+                tags: "234 vartai skaiciai garazai",
+                phoneImg: "images/20261010111422_1.jpg",
+                fullImg: "images/20261010111430_1.jpg"
+            },
+            {
+                title: "Los Santos Airport Service Door",
+                location: "Runway1",
+                tags: "melyna durys siena lempa oro uostas",
+                phoneImg: "images/20261009082132_1.jpg",
+                fullImg: "images/20261009082144_1.jpg"
+            },
+            {
+                title: "Mirror Park Alleyway",
+                location: "West Mirror Drive",
+                tags: "durys siena takas krumai",
+                phoneImg: "images/20261008230531_1.jpg",
+                fullImg: "images/20261008230542_1.jpg"
+            },
+            {
+                title: "Mirror Park Car Accessories Shop",
+                location: "West Mirror Drive",
+                tags: "konteineris lentyna accessories",
+                phoneImg: "images/20261011152526_1.jpg",
+                fullImg: "images/20261011152539_1.jpg"
+            },
+            {
+                title: "Morningwood Cinema",
+                location: "Morningwood",
+                tags: "langai plyteles kasa",
+                phoneImg: "images/20261008125418_1.jpg",
+                fullImg: "images/20261008125438_1.jpg"
+            },
+            {
+                title: "Paleto Bay Train",
+                location: "Great Ocean Hwy",
+                tags: "traukinys begiai vagonas",
+                phoneImg: "images/20261010162211_1.jpg",
+                fullImg: "images/20261010162247_2.jpg"
+            },
+            {
+                title: "Paleto Bay Warehouse Wall",
+                location: "Paleto Blvd",
+                tags: "garazas vartai konteineris",
+                phoneImg: "images/20261011101037_1.jpg",
+                fullImg: "images/20261011101048_2.jpg"
+            },
+            {
+                title: "Rockford Hills Archway",
+                location: "Cougar Ave",
+                tags: "durys arka",
+                phoneImg: "images/20261010150927_1.jpg",
+                fullImg: "images/20261010150936_2.jpg"
+            },
+            {
+                title: "Sandy Shores Garages",
+                location: "Zancudo Ave",
+                tags: "garazas vartai dezes padangos",
+                phoneImg: "images/20261010103031_1.jpg",
+                fullImg: "images/20261010103039_1.jpg"
+            },
+            {
+                title: "Terminal Alpha Mail",
+                location: "Buccaneer Way",
+                tags: "plakatas siena padangos platforma alpha mail couriers",
+                phoneImg: "images/20261008221900_1.jpg",
+                fullImg: "images/20261008221917_1.jpg"
+            },
+            {
+                title: "Terminal Loading Docks",
+                location: "Buccaneer Way",
+                tags: "vartai no parking 12",
+                phoneImg: "images/20261011115607_1.jpg",
+                fullImg: "images/20261011115618_1.jpg"
+            },
+            {
+                title: "West Vinewood Courtyard",
+                location: "Spanish Ave",
+                tags: "langai kiemas medziai siena",
+                phoneImg: "images/20261008150049_1.jpg",
+                fullImg: "images/20261008150106_1.jpg"
+            },
+            {
+                title: "Zancudo River Scrap Yard",
+                location: "Marina Dr",
+                tags: "konteineris vandens bokstas automobiliai padangos",
+                phoneImg: "images/20261009171203_1.jpg",
+                fullImg: "images/20261009171358_1.jpg"
+            }
+        ];
+
+        function renderGallery(items) {
+            const grid = document.getElementById('galleryGrid');
+            grid.innerHTML = '';
+
+            items.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => openModal(item.fullImg, `${item.title} - ${item.location}`);
+
+                card.innerHTML = `
+                    <div class="card-phone-screen" style="background-image: url('${item.phoneImg}');"></div>
+                    <div class="card-info">
+                        <div>
+                            <div class="card-title">${item.title}</div>
+                            <div class="location-info">📍 ${item.location}</div>
+                        </div>
+                        <div class="card-tags">
+                            ${item.tags.split(' ').map(tag => `<span class="tag">#${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterImages() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = treasures.filter(item => {
+                return item.title.toLowerCase().includes(query) ||
+                       item.location.toLowerCase().includes(query) ||
+                       item.tags.toLowerCase().includes(query);
+            });
+            renderGallery(filtered);
+        }
+
+        function openModal(imgSrc, caption) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImg');
+            const modalText = document.getElementById('modalText');
+            
+            modal.style.display = 'flex';
+            modalImg.src = imgSrc;
+            modalText.innerText = caption;
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        renderGallery(treasures);
+    </script>
+</body>
+</html>
